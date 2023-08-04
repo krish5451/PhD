@@ -1,0 +1,198 @@
+"""Then start importing them into the code """
+import tensorflow as tf
+from tensorflow import keras
+from tensorflow.keras import Sequential
+from tensorflow.keras.layers import Flatten, Dense
+import numpy as np
+import pandas as pd
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import LabelEncoder
+from sklearn.preprocessing import StandardScaler
+import matplotlib.pyplot as plt
+import seaborn as sns
+from sklearn.metrics import confusion_matrix, accuracy_score
+from ann_visualizer.visualize import ann_viz
+from graphviz import Source
+"""Upload the data and process it for the performance """
+dataset = pd.read_csv('DATA.csv')
+dataset.head()
+sns.pairplot(dataset[['Fy','Fck','D','K0']], diag_kind='kde')
+plt.savefig("Data_distribution.png", dpi=1200)
+scaler = StandardScaler()
+x = dataset.drop(labels=['Damage','DI'], axis=1)
+#y = dataset['DI']
+y = pd.get_dummies(dataset['Damage']).values
+x = scaler.fit_transform(x)
+X_train, X_test, y_train, y_test = train_test_split(x,y, test_size = 0.3, 
+random_state=0)
+model = Sequential()
+#model.add(Dense(x.shape[1], activation='softplus', input_dim=X_train))
+model.add(Dense(16, activation='softplus', input_dim=x.shape[1]))
+#model.add(Dense(1, activation='softplus')) #softplus
+model.add(Dense(5, activation='softmax')) #softmax
+model.compile(optimizer='RMSprop', loss='binary_crossentropy', 
+metrics=['accuracy'])
+from keras.callbacks import EarlyStopping, ModelCheckpoint
+checkpoint_filepath = '/tmp/checkpoint'
+es = EarlyStopping(monitor='val_loss', mode='min', verbose=1, patience=50)
+mc = ModelCheckpoint(filepath=checkpoint_filepath, monitor='val_loss', 
+save_weights_only=True, save_best_only=True, period=2)
+history = model.fit(X_train, y_train, batch_size = 10, epochs=50, verbose=1, 
+validation_data=(X_test,y_test), callbacks=[es, mc])
+model.summary()
+_, acc = model.evaluate(X_test, y_test)
+print('Accuracy =', (acc* 100.0),'%')
+loss = history.history['loss']
+val_loss = history.history['val_loss']
+epochs = range(1, len(loss)+1)
+plt.plot(epochs, loss, 'r', label='Training data')
+plt.plot(epochs, val_loss, 'b', label= 'Validation data')
+plt.legend()
+plt.xlabel('Epochs')
+plt.ylabel('Loss')
+plt.savefig("Data_Loss.png", dpi=1200)
+plt.show()
+acc = history.history['accuracy']
+val_acc = history.history['val_accuracy']
+plt.plot(epochs, acc, 'r', label='Training data')
+plt.plot(epochs, val_acc, 'b', label='Validation data')
+#plt.title('Accuracy')
+plt.xlabel('Epochs')
+plt.ylabel('Accuracy')
+plt.legend()
+plt.savefig("Data_Accuracy.png", dpi=1200)
+plt.show()
+# Predict the class of a single flower.
+prediction = np.around(model.predict(np.expand_dims(X_test[0], 
+axis=0))).astype(np.int)[0]
+print("Actual: %s\tEstimated: %s" % (y_test[0].astype(np.int), prediction))
+#print("That means it's a %s" % outputs_vals[prediction.astype(np.bool)][0])
+"""details about all the weight and bias"""
+for layer_depth, layer in enumerate(model.layers):
+weights = layer.get_weights()[0]
+biases = layer.get_weights()[1]
+print('_______layer', layer_depth,'________')
+for toNeuronNum, bias in enumerate(biases):
+print(f'Bias to Layer {layer_depth+1}Nueron{toNeuronNum}: {bias}')
+for fromNeuronNum, wgt in enumerate(weights):
+for toNeuronNum, wgt2 in enumerate(wgt):
+print(f'Layer {layer_depth}, Neuron{fromNeuronNum} to 
+layer{layer_depth+1}, Neuron{toNeuronNum} = {wgt2}')
+y_pred = model.predict(X_test)
+y_train_pred = model.predict(X_train)
+plt.plot(y_pred, y_test, '*g')
+plt.plot(y_train_pred, y_train, '*g')
+#plt.plot(X_test, y_test_pred, '*g')
+#plt.plot(X_test, y_test,'*r')
+y_pred1 = model.predict(X_test)
+y_train_pred = model.predict(X_train)
+"""X_train, X_test, y_train, y_test here, it is for the testing data set"""
+y_pred = model.predict(X_test)
+y_train_pred = model.predict(X_train)
+y_pred = np.argmax(y_pred, axis=1)
+y_test = np.argmax(y_test, axis=1)
+cm = confusion_matrix(y_test, y_pred)
+print(cm)
+cm = confusion_matrix(y_test, y_pred)
+sns.heatmap(cm, annot=True, fmt='g')
+plt.savefig("testing Confusion.png", dpi=1200)
+"""here it is for the training data set"""
+y_train_pred = model.predict(X_train)
+y_train_pred = np.argmax(y_train_pred, axis=1)
+y_train = np.argmax(y_train, axis=1)
+cm = confusion_matrix(y_train, y_train_pred)
+print(cm)
+cm = confusion_matrix(y_train, y_train_pred)
+sns.heatmap(cm, annot=True, fmt='g')
+plt.savefig("training Confusion.png", dpi=1200)
+y_test_pred = np.argmax(y_test_pred, axis=1)
+y_test = np.argmax(y_test, axis=1)
+cm = confusion_matrix(y_test, y_test_pred)
+print(cm)
+cm = confusion_matrix(y_test, y_test_pred)
+sns.heatmap(cm, annot=True, fmt='g')
+plt.savefig("3N train Confusion.png", dpi=1200)
+y_pred = model.predict(X_test)
+y_train_pred = model.predict(X_train)
+y_pred = np.argmax(y_pred, axis=1)
+y_test = np.argmax(y_test, axis=1)
+cm = confusion_matrix(y_test, y_pred)
+print(cm)
+cm = confusion_matrix(y_test, y_pred)
+sns.heatmap(cm, annot=True, fmt='g')
+plt.savefig("Confusion.png", dpi=1200)
+!pip3 install keras-tuner
+import pandas as pd
+from tensorflow import keras
+from tensorflow.keras import layers
+from kerastuner.tuners import RandomSearch
+import numpy as np
+import keras_tuner as kt
+dataset=pd.read_csv('DATA.csv')
+X = dataset.drop(labels=['Damage','DI'], axis=1)
+y = dataset['DI']
+def build_model(hp):
+model = keras.Sequential()
+#model.add(Dense(3, activation='softplus', input_dim=x.shape[1]))
+for i in range(hp.Int('num_layers', 0, 8)):
+model.add(layers.Dense(units=hp.Int('units_' + str(i),
+min_value=0,
+max_value=10,
+step=1),
+activation='relu'))
+model.add(layers.Dense(1, activation='linear'))
+model.compile(
+optimizer=keras.optimizers.Adam(
+hp.Choice('learning_rate', [1e-2, 1e-3, 1e-4])),
+loss='mean_absolute_error',
+metrics=['mean_absolute_error'])
+return model
+tuner = RandomSearch(
+build_model,
+objective='val_mean_absolute_error',
+max_trials=5,
+executions_per_trial=3,
+directory='project-21',
+project_name='Seismic Vulnerability using ANN-234')
+tuner.search_space_summary()
+from sklearn.model_selection import train_test_split
+Appendix-D
+147
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, 
+random_state=0)
+tuner.search(X_train, y_train,
+epochs=25,
+validation_data=(X_test, y_test), 
+callbacks=[keras.callbacks.TensorBoard("/tmp/tb_logs")])
+tuner.results_summary()
+# Commented out IPython magic to ensure Python compatibility.
+# %load_ext tensorboard
+# %tensorboard --logdir /tmp/tb_logs
+best_model = tuner.get_best_models()[0]
+#best_model.build(x_train_scaled.shape)
+best_model.summary()
+"""graph ploting and all"""
+dataset = pd.read_csv('DATA.csv')
+dataset.head()
+X = dataset.drop(labels=['Damage'], axis=1)
+y = dataset['Damage']
+from sklearn.model_selection import train_test_split
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3,
+random_state=0)
+X_train.shape, X_test.shape
+from sklearn.feature_selection import mutual_info_classif
+# determine the mutual information
+mutual_info = mutual_info_classif(X_train, y_train)
+mutual_info
+mutual_info = pd.Series(mutual_info)
+mutual_info.index = X_train.columns
+mutual_info.sort_values(ascending=False)
+#let's plot the ordered mutual_info values per feature
+mutual_info.sort_values(ascending=False).plot.bar(figsize=(20, 8))
+X_train.corr()
+#plt.figure(figsize=(16,10))
+cor = X.corr()
+sns.heatmap(cor,annot=True, fmt=".2f", center=0,linewidths=.5,cmap="YlGnBu")
+plt.tight_layout()
+plt.savefig("Correlation.png", dpi=1200)
+dataset.describe()
